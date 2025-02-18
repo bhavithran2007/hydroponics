@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Plant Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(to right, #141e30, #243b55);
+            color: white;
+        }
+        .gauge-container {
+            display: inline-block;
+            width: 300px;
+            margin: 20px;
+        }
+        .switch-container {
+            margin: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+        .switch {
+            width: 90px;
+            height: 45px;
+            background-color: red;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+        }
+        .switch.on {
+            background-color: green;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+        }
+        .switch span {
+            width: 35px;
+            height: 35px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .switch.on span {
+            transform: translateX(45px);
+        }
+        #led {
+            width: 20px;
+            height: 20px;
+            background-color: grey;
+            border-radius: 50%;
+            display: inline-block;
+            margin-top: 10px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        .gauge-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Smart Plant Monitoring</h1>
+    
+    <div class="gauge-container">
+        <div class="gauge-title">Temperature</div>
+        <canvas id="tempGauge"></canvas>
+    </div>
+    <div class="gauge-container">
+        <div class="gauge-title">Humidity</div>
+        <canvas id="humidityGauge"></canvas>
+    </div>
+    <div class="gauge-container">
+        <div class="gauge-title">Soil Moisture</div>
+        <canvas id="soilGauge"></canvas>
+    </div>
+    
+    <div class="switch-container">
+        <div>
+            <h3>Motor Control</h3>
+            <div class="switch" id="motorSwitch" onclick="toggleMotor()">
+                <span></span>
+            </div>
+        </div>
+        
+        <div>
+            <h3>PIR Sensor</h3>
+            <div class="switch" id="pirSwitch" onclick="togglePIR()">
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <h3>Motion Detection</h3>
+    <div id="led"></div>
+    
+    <script>
+        let motorState = 0;
+        let pirState = 0;
+
+        function updateGauges(temp, humidity, soil) {
+            updateGauge('tempGauge', temp || 0, '°C', 'rgba(255, 69, 0, 0.8)');
+            updateGauge('humidityGauge', humidity || 0, '%', 'rgba(30, 144, 255, 0.8)');
+            updateGauge('soilGauge', soil || 0, '%', 'rgba(50, 205, 50, 0.8)');
+        }
+
+        function updateGauge(id, value, unit, color) {
+            let ctx = document.getElementById(id).getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: { 
+                    datasets: [{ 
+                        data: [value, 100 - value], 
+                        backgroundColor: [color, '#444'],
+                        borderWidth: 2
+                    }]
+                },
+                options: { 
+                    rotation: -Math.PI, 
+                    circumference: Math.PI, 
+                    cutout: '70%',
+                    plugins: { tooltip: { enabled: false } }
+                }
+            });
+        }
+
+        function toggleMotor() {
+            motorState = motorState === 0 ? 1 : 0;
+            fetch('control.php?motor=' + motorState);
+
+            let switchElement = document.getElementById('motorSwitch');
+            switchElement.classList.toggle('on', motorState === 1);
+        }
+
+        function togglePIR() {
+            pirState = pirState === 0 ? 1 : 0;
+            fetch('control.php?pir=' + pirState);
+
+            let switchElement = document.getElementById('pirSwitch');
+            switchElement.classList.toggle('on', pirState === 1);
+        }
+        
+        function updateLED(motion) {
+            document.getElementById('led').style.backgroundColor = motion ? 'red' : 'grey';
+        }
+
+        function fetchData() {
+            fetch('data.php')
+                .then(response => response.json())
+                .then(data => {
+                    updateGauges(data.temp, data.humidity, data.soil);
+                    updateLED(data.motion);
+                });
+        }
+        
+        setInterval(fetchData, 5000);
+    </script>
+</body>
+</html>
