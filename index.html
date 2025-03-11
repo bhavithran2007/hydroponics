@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Plant Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: linear-gradient(to right, #141e30, #243b55);
+            color: white;
+        }
+        .gauge-container {
+            display: inline-block;
+            width: 250px;
+            margin: 20px;
+        }
+        .gauge-value {
+            font-size: 20px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: inline-block;
+            min-width: 60px;
+        }
+        .switch-container {
+            margin: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+        .switch {
+            width: 90px;
+            height: 45px;
+            background-color: red;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+        }
+        .switch.on {
+            background-color: green;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+        }
+        .switch span {
+            width: 35px;
+            height: 35px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .switch.on span {
+            transform: translateX(45px);
+        }
+        #led {
+            width: 20px;
+            height: 20px;
+            background-color: grey;
+            border-radius: 50%;
+            display: inline-block;
+            margin-top: 10px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        .gauge-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Smart Plant Monitoring</h1>
+    
+    <div class="gauge-container">
+        <div class="gauge-title">Temperature</div>
+        <canvas id="tempGauge"></canvas>
+        <div class="gauge-value" id="tempValue">0°C</div>
+    </div>
+    <div class="gauge-container">
+        <div class="gauge-title">Humidity</div>
+        <canvas id="humidityGauge"></canvas>
+        <div class="gauge-value" id="humidityValue">0%</div>
+    </div>
+    <div class="gauge-container">
+        <div class="gauge-title">Soil Moisture</div>
+        <canvas id="soilGauge"></canvas>
+        <div class="gauge-value" id="soilValue">0%</div>
+    </div>
+    
+    <div class="switch-container">
+        <div>
+            <h3>Motor Control</h3>
+            <div class="switch" id="motorSwitch" onclick="toggleMotor()">
+                <span></span>
+            </div>
+        </div>
+        
+        <div>
+            <h3>PIR Sensor</h3>
+            <div class="switch" id="pirSwitch" onclick="togglePIR()">
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <h3>Motion Detection</h3>
+    <div id="led"></div>
+    
+    <script>
+        let motorState = 0;
+        let pirState = 0;
+        let tempChart, humidityChart, soilChart;
+
+        function createGauge(ctx, value, color) {
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [value, 100 - value],
+                        backgroundColor: [color, '#333'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    rotation: -Math.PI,
+                    circumference: Math.PI,
+                    cutout: '85%', // Thinner gauge
+                    plugins: { tooltip: { enabled: false } }
+                }
+            });
+        }
+
+        function updateGauges(temp = 0, humidity = 0, soil = 0) {
+            document.getElementById('tempValue').innerText = temp + "°C";
+            document.getElementById('humidityValue').innerText = humidity + "%";
+            document.getElementById('soilValue').innerText = soil + "%";
+
+            if (!tempChart) {
+                tempChart = createGauge(document.getElementById('tempGauge').getContext('2d'), temp, 'rgba(255, 69, 0, 1)');
+            } else {
+                tempChart.data.datasets[0].data = [temp, 100 - temp];
+                tempChart.update();
+            }
+
+            if (!humidityChart) {
+                humidityChart = createGauge(document.getElementById('humidityGauge').getContext('2d'), humidity, 'rgba(0, 191, 255, 1)');
+            } else {
+                humidityChart.data.datasets[0].data = [humidity, 100 - humidity];
+                humidityChart.update();
+            }
+
+            if (!soilChart) {
+                soilChart = createGauge(document.getElementById('soilGauge').getContext('2d'), soil, 'rgba(50, 205, 50, 1)');
+            } else {
+                soilChart.data.datasets[0].data = [soil, 100 - soil];
+                soilChart.update();
+            }
+        }
+
+        function toggleMotor() {
+            motorState = motorState === 0 ? 1 : 0;
+            fetch('control.php?motor=' + motorState);
+
+            let switchElement = document.getElementById('motorSwitch');
+            switchElement.classList.toggle('on', motorState === 1);
+        }
+
+        function togglePIR() {
+            pirState = pirState === 0 ? 1 : 0;
+            fetch('control.php?pir=' + pirState);
+
+            let switchElement = document.getElementById('pirSwitch');
+            switchElement.classList.toggle('on', pirState === 1);
+        }
+
+        function updateLED(motion) {
+            document.getElementById('led').style.backgroundColor = motion ? 'red' : 'grey';
+        }
+
+        function fetchData() {
+            fetch('data.php')
+                .then(response => response.json())
+                .then(data => {
+                    updateGauges(data.temp || 0, data.humidity || 0, data.soil || 0);
+                    updateLED(data.motion);
+                })
+                .catch(error => console.error("Error fetching data:", error));
+        }
+
+        // Initialize gauges with default values
+        window.onload = function() {
+            updateGauges(0, 0, 0);
+        };
+
+        // Update every second for real-time data
+        setInterval(fetchData, 1000);
+    </script>
+</body>
+</html>
